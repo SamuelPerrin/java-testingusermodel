@@ -1,6 +1,7 @@
 package com.lambdaschool.usermodel.services;
 
 import com.lambdaschool.usermodel.UserModelApplicationTesting;
+import com.lambdaschool.usermodel.exceptions.ResourceNotFoundException;
 import com.lambdaschool.usermodel.models.Role;
 import com.lambdaschool.usermodel.models.User;
 import com.lambdaschool.usermodel.models.UserRoles;
@@ -17,10 +18,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.junit4.SpringRunner;
 
+import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.Assert.*;
+import static org.mockito.ArgumentMatchers.any;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = UserModelApplicationTesting.class,
@@ -145,10 +149,33 @@ public class UserServiceImplUnitTestNoDB {
 
     @Test
     public void findUserById() {
+        Mockito.when(userrepos.findById(1L))
+                .thenReturn(Optional.of(userList.get(0)));
+        assertEquals("admin", userService.findUserById(1L).getUsername());
+    }
+
+    @Test(expected = ResourceNotFoundException.class)
+    public void findUserByIdFail() {
+        Mockito.when(userrepos.findById(10000L))
+                .thenThrow(ResourceNotFoundException.class);
+
+        assertEquals("admin", userService.findUserById(10000L).getUsername());
     }
 
     @Test
     public void findByNameContaining() {
+        Mockito.when(userrepos.findByUsernameContainingIgnoreCase("a"))
+                .thenReturn(userList);
+
+        assertEquals(5, userService.findByNameContaining("a").size());
+    }
+
+    @Test(expected = ResourceNotFoundException.class)
+    public void findByNameContainingFail() {
+        Mockito.when(userrepos.findByUsernameContainingIgnoreCase("qxy"))
+                .thenThrow(ResourceNotFoundException.class);
+
+        assertEquals(5, userService.findByNameContaining("qxy").size());
     }
 
     @Test
@@ -161,14 +188,84 @@ public class UserServiceImplUnitTestNoDB {
 
     @Test
     public void delete() {
+        Mockito.when(userrepos.findById(1L))
+                .thenReturn(Optional.of(userList.get(0)));
+
+        Mockito.doNothing()
+                .when(userrepos)
+                .deleteById(1L);
+
+        userService.delete(1L);
+        assertEquals(5, userList.size());
+    }
+
+    @Test(expected = ResourceNotFoundException.class)
+    public void deleteFail() {
+        Mockito.when(userrepos.findById(999L))
+                .thenThrow(ResourceNotFoundException.class);
+
+        Mockito.doNothing()
+                .when(userrepos)
+                .deleteById(999L);
+
+        userService.delete(1L);
+        assertEquals(5, userList.size());
     }
 
     @Test
     public void findByName() {
+        Mockito.when(userrepos.findByUsername("admin"))
+                .thenReturn(userList.get(0));
+
+        assertEquals("admin",
+                userService.findByName("admin").getUsername());
+    }
+
+    @Test(expected = ResourceNotFoundException.class)
+    public void findByNameFail() {
+        Mockito.when(userrepos.findByUsername("Alexander the Great"))
+                .thenThrow(ResourceNotFoundException.class);
+
+        assertEquals("Alexander the Great",
+                userService.findByName("Alexander the Great").getUsername());
     }
 
     @Test
     public void save() {
+        User u6 = new User("newtestuser",
+                "testing",
+                "test@test.test");
+        Role r4 = new Role("admin");
+        u6.getRoles().add(new UserRoles(u6, r4));
+
+        Mockito.when(userrepos.save(any(User.class)))
+                .thenReturn(u6);
+
+
+        User addUser = userService.save(u6);
+        assertNotNull(addUser);
+        assertEquals(u6.getUsername(), addUser.getUsername());
+    }
+
+    @Test
+    public void saveput() {
+        User u7 = new User("newtestuser",
+                "testing",
+                "test@test.test");
+        u7.setUserid(70);
+        Role r5 = new Role("admin");
+        r5.setRoleid(71);
+        u7.getRoles().add(new UserRoles(u7, r5));
+
+        Mockito.when(userrepos.findById(70L))
+                .thenReturn(Optional.of(u7));
+        Mockito.when(roleService.findRoleById(71L))
+                .thenReturn(r5);
+
+        Mockito.when(userrepos.save(any(User.class)))
+                .thenReturn(u7);
+
+        assertEquals(70L, userService.save(u7).getUserid());
     }
 
     @Test
